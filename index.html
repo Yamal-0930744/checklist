@@ -139,14 +139,14 @@
 
   /* timeline */
   .tl { margin-top: 18px; }
-  .tl-day { position: relative; display: grid; grid-template-columns: 56px 1fr; gap: 14px; padding-bottom: 22px; }
-  .tl-day::before { content: ""; position: absolute; left: 63px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+  .tl-day { position: relative; display: grid; grid-template-columns: 60px 1fr; gap: 24px; padding-bottom: 22px; }
+  .tl-day::before { content: ""; position: absolute; left: 71px; top: 0; bottom: 0; width: 2px; background: var(--line); }
   .tl-day:last-child::before { bottom: auto; height: 100%; }
-  .tl-dot { position: absolute; left: 58px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--muted); z-index: 1; }
+  .tl-dot { position: absolute; left: 66px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--muted); z-index: 1; }
   .tl-day.past .tl-dot { border-color: var(--line); background: var(--surface-2); }
   .tl-day.past.overdue .tl-dot { border-color: var(--danger); }
   .tl-day.today .tl-dot { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-  .tl-day.milestone .tl-dot { left: 56px; top: 3px; width: 16px; height: 16px; background: var(--accent); border-color: var(--accent); }
+  .tl-day.milestone .tl-dot { left: 64px; top: 3px; width: 16px; height: 16px; background: var(--accent); border-color: var(--accent); }
   .tl-day.nodate .tl-dot { border-style: dashed; }
   .tl-date { text-align: right; display: grid; gap: 1px; padding-top: 1px; font-variant-numeric: tabular-nums; }
   .tl-date b { font-family: var(--font-display); font-size: 0.9rem; font-weight: 700; color: var(--fg); white-space: nowrap; }
@@ -350,7 +350,7 @@
   function renderTask(t) {
     var cls = "task" + (t.done ? " done" : "") + (state.expanded === t.id ? " editing" : "");
     var meta = chipsFor(t);
-    if (state.view === "timeline") { var sec = secById(t.section); if (sec) meta += '<span class="chip small sec">' + esc(sec.title) + '</span>'; }
+    if (state.view === "timeline") { var sec = secById(t.section); if (sec && (!sec.date || (t.due || sec.date) !== sec.date)) meta += '<span class="chip small sec">' + esc(sec.title) + '</span>'; }
     if (t.due) meta += '<span class="due' + (!t.done && t.due < today() ? " overdue" : "") + '">📅 ' + esc(fmtDate(t.due)) + '</span>';
     if (t.done && t.doneAt) meta += '<span class="doneat">✓ done ' + esc(fmtDate(t.doneAt)) + '</span>';
     var html = '<li class="' + cls + '" data-id="' + esc(t.id) + '">' +
