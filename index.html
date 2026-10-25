@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>UC39 Things To Do</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
   html, body { margin: 0; }
@@ -457,7 +459,8 @@
     renderFilters(); renderOverall();
     var vb = $("views").querySelectorAll("button"); for (var i = 0; i < vb.length; i++) { var on = vb[i].dataset.view === state.view; vb[i].classList.toggle("on", on); vb[i].setAttribute("aria-selected", on ? "true" : "false"); }
     var secs = state.sections.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
-    if (state.view === "timeline") app.innerHTML = renderTimeline();
+    if (!state.tasks.length && !state.sections.length) app.innerHTML = '<div class="state">The list is empty.<br><br><button class="btn primary" id="btn-seed">Load the spreadsheet tasks</button></div>';
+    else if (state.view === "timeline") app.innerHTML = renderTimeline();
     else if (!secs.length) { app.innerHTML = '<div class="state">No milestones yet. Add the first one below.</div>'; }
     else app.innerHTML = secs.map(renderSection).join("");
     $("nt-sec").innerHTML = secs.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.title) + '</option>'; }).join("");
@@ -540,110 +543,51 @@
     if (b.dataset.armed) removePerson(b.dataset.remove); else { b.dataset.armed = "1"; b.textContent = "remove?"; b.style.color = "var(--danger)"; }
   });
 
-  /* ---------- data (shared JSON record on jsonblob.com) ---------- */
-  // The list lives in one JSON record. Its id travels in the link after "#", so the link is the only key.
-  var STORE_API = "https://jsonblob.com/api/jsonBlob";
+  /* ---------- data (Firebase Realtime Database) ---------- */
+  // The database address travels in the link after "#db=", so the link is all anyone needs.
   var SEED = {"meta": {"people": {"names": ["Papa", "Mama", "Yamal", "Jason", "Zhayra", "Jaeve", "Luca"]}}, "sections": {"s01": {"title": "Vertrek mama en papa naar Curaçao", "date": "2026-10-18", "order": 1}, "s02": {"title": "31 oktober", "date": "2026-10-31", "order": 2}, "s03": {"title": "Terugkeer mama en papa", "order": 3}, "s04": {"title": "Tunnelloop Zhayra", "order": 4}, "s05": {"title": "Papa jarig", "order": 5}, "s06": {"title": "Operatie Zhayra", "order": 6}, "s07": {"title": "Jaeve terug naar Curaçao", "order": 7}, "s08": {"title": "Zhayra naar huis ???????", "order": 8}, "s09": {"title": "Container Yamal", "order": 9}, "s10": {"title": "Yamal naar Curaçao", "order": 10}, "s11": {"title": "Einde huur Zhayra Den Haag", "date": "2026-12-01", "order": 11}}, "tasks": {"t01": {"title": "TUI ticket 03 january regelen", "section": "s01", "assignees": ["Papa"], "done": false, "note": "", "order": 1, "createdAt": "2026-10-25T00:00:01Z"}, "t02": {"title": "kleine kamer opruimen", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 2, "createdAt": "2026-10-25T00:00:02Z"}, "t03": {"title": "zwarte kast ontruimen", "section": "s01", "assignees": ["Jaeve"], "done": false, "note": "", "order": 3, "createdAt": "2026-10-25T00:00:03Z"}, "t04": {"title": "zolder kamer leeghalen", "section": "s01", "assignees": ["Jaeve"], "done": false, "note": "", "order": 4, "createdAt": "2026-10-25T00:00:04Z"}, "t05": {"title": "oude kleren naar milieustraat", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 5, "createdAt": "2026-10-25T00:00:05Z"}, "t06": {"title": "oude spullen naar milieustraat", "section": "s01", "assignees": ["Yamal"], "done": false, "note": "", "order": 6, "createdAt": "2026-10-25T00:00:06Z"}, "t07": {"title": "offerte Expert.NL", "section": "s01", "assignees": ["Mama"], "done": false, "note": "", "order": 7, "createdAt": "2026-10-25T00:00:07Z"}, "t08": {"title": "Zhayra verhuizen", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 8, "createdAt": "2026-10-25T00:00:08Z"}, "t09": {"title": "busje huren voor verhuizen", "section": "s01", "assignees": ["Yamal"], "done": false, "note": "", "order": 9, "createdAt": "2026-10-25T00:00:09Z"}, "t10": {"title": "bed Zhayra opzetten", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 10, "createdAt": "2026-10-25T00:00:10Z"}, "t11": {"title": "witte kast Yamal demonteren", "section": "s01", "assignees": ["Yamal"], "done": false, "note": "", "order": 11, "createdAt": "2026-10-25T00:00:11Z"}, "t12": {"title": "inpakken spullen Yamal / Luca", "section": "s01", "assignees": ["Yamal"], "done": false, "note": "", "order": 12, "createdAt": "2026-10-25T00:00:12Z"}, "t13": {"title": "fysiotherapie in de buurt zoeken", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 13, "createdAt": "2026-10-25T00:00:13Z"}, "t14": {"title": "aankoop spullen Expert.NL", "section": "s01", "assignees": ["Papa"], "done": false, "note": "", "order": 14, "createdAt": "2026-10-25T00:00:14Z"}, "t15": {"title": "installatie spullen Expert.NL", "section": "s01", "assignees": ["Jaeve"], "done": false, "note": "", "order": 15, "createdAt": "2026-10-25T00:00:15Z"}, "t16": {"title": "inmeting Expert.NL", "section": "s01", "assignees": ["Jaeve"], "done": false, "note": "", "order": 16, "createdAt": "2026-10-25T00:00:16Z", "due": "2026-10-19"}, "t17": {"title": "tv meubel Zhayra", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 17, "createdAt": "2026-10-25T00:00:17Z"}, "t18": {"title": "weghalen boiler", "section": "s01", "assignees": ["Jaeve", "Yamal"], "done": false, "note": "", "order": 18, "createdAt": "2026-10-25T00:00:18Z"}, "t19": {"title": "installatie nieuwe boiler", "section": "s01", "assignees": ["Yamal"], "done": false, "note": "", "order": 19, "createdAt": "2026-10-25T00:00:19Z"}, "t20": {"title": "gordijnen zetten", "section": "s01", "assignees": [], "done": false, "note": "", "order": 20, "createdAt": "2026-10-25T00:00:20Z"}, "t21": {"title": "ikea trip", "section": "s01", "assignees": ["Jason", "Zhayra"], "done": false, "note": "", "order": 21, "createdAt": "2026-10-25T00:00:21Z"}, "t22": {"title": "spullen schuur naar milieustraat", "section": "s02", "assignees": ["Yamal", "Jason"], "done": false, "note": "", "order": 1, "createdAt": "2026-10-25T00:00:22Z"}, "t23": {"title": "zwarte kast naar milieustraat", "section": "s02", "assignees": ["Yamal", "Jason"], "done": false, "note": "", "order": 2, "createdAt": "2026-10-25T00:00:23Z"}, "t24": {"title": "brengen meubels Den Haag (tv meubel …)", "section": "s02", "assignees": ["Yamal", "Jason"], "done": false, "note": "Text was cut off in the spreadsheet, please complete the title.", "order": 3, "createdAt": "2026-10-25T00:00:24Z"}, "t25": {"title": "bed Zhayra opzetten", "section": "s02", "assignees": ["Jaeve", "Zhayra", "Luca"], "done": false, "note": "", "order": 4, "createdAt": "2026-10-25T00:00:25Z"}, "t26": {"title": "fysiotherapie afspraak", "section": "s04", "assignees": ["Zhayra"], "done": false, "note": "", "order": 1, "createdAt": "2026-10-25T00:00:26Z"}, "t27": {"title": "check nazorg Zhayra", "section": "s04", "assignees": ["Papa"], "done": false, "note": "", "order": 2, "createdAt": "2026-10-25T00:00:27Z"}, "t28": {"title": "afleveren spullen zorgwinkel", "section": "s04", "assignees": ["Zhayra"], "done": false, "note": "", "order": 3, "createdAt": "2026-10-25T00:00:28Z"}, "t29": {"title": "ziekenhuis koffer inpakken", "section": "s04", "assignees": ["Zhayra"], "done": false, "note": "", "order": 4, "createdAt": "2026-10-25T00:00:29Z"}, "t30": {"title": "pyjamas Zhayra kopen", "section": "s04", "assignees": ["Mama"], "done": false, "note": "", "order": 5, "createdAt": "2026-10-25T00:00:30Z"}, "t31": {"title": "ontruimen woonkamer", "section": "s06", "assignees": ["Papa", "Mama", "Yamal", "Jason", "Zhayra", "Jaeve", "Luca"], "done": false, "note": "", "order": 1, "createdAt": "2026-10-25T00:00:31Z"}, "t32": {"title": "aanpassen woning", "section": "s06", "assignees": ["Papa", "Mama", "Yamal", "Jason", "Zhayra", "Jaeve", "Luca"], "done": false, "note": "", "order": 2, "createdAt": "2026-10-25T00:00:32Z"}, "t33": {"title": "ontvangst spullen zorgwinkel", "section": "s06", "assignees": ["Mama", "Papa"], "done": false, "note": "", "order": 3, "createdAt": "2026-10-25T00:00:33Z"}}};
-  var storeId = (location.hash || "").replace(/^#/, "").trim();
-  var cache = null, queue = Promise.resolve(), pending = 0, pollTimer = null;
+  var dbUrl = "", root = null;
+  (function () { var m = (location.hash || "").match(/[#&]db=([^&]+)/); if (m) { try { dbUrl = decodeURIComponent(m[1]); } catch (e) { dbUrl = m[1]; } } })();
 
   function objToList(obj) { var out = []; if (!obj) return out; Object.keys(obj).forEach(function (k) { var o = Object.assign({}, obj[k]); o.id = k; out.push(o); }); return out; }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function applyDoc(doc) {
-    cache = doc;
-    state.sections = objToList(doc.sections);
-    state.tasks = objToList(doc.tasks);
-    state.people = (doc.meta && doc.meta.people && Array.isArray(doc.meta.people.names)) ? doc.meta.people.names.slice() : [];
-    state.loaded.sections = state.loaded.tasks = state.loaded.people = true;
-    try { localStorage.setItem("uc39.backup", JSON.stringify(doc)); } catch (e) {}
-    render();
-  }
-  function hdrs() { return { "Content-Type": "application/json", "Accept": "application/json" }; }
-  async function load() {
-    var r = await fetch(STORE_API + "/" + storeId, { headers: { "Accept": "application/json" }, cache: "no-store" });
-    if (r.status === 404) { var e = new Error("gone"); e.code = "gone"; throw e; }
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    var doc = await r.json();
-    if (!doc || typeof doc !== "object") throw new Error("The list record is empty");
-    $("ro-notice").hidden = true;
-    applyDoc(doc);
-    return doc;
-  }
-  async function save(doc) {
-    var r = await fetch(STORE_API + "/" + storeId, { method: "PUT", headers: hdrs(), body: JSON.stringify(doc) });
-    if (!r.ok) throw new Error("Save failed (HTTP " + r.status + ")");
-    $("ro-notice").hidden = true;
-    applyDoc(doc);
-  }
-  async function create(doc) {
-    var r = await fetch(STORE_API, { method: "POST", headers: hdrs(), body: JSON.stringify(doc) });
-    if (!r.ok) throw new Error("Could not create the list (HTTP " + r.status + ")");
-    var id = r.headers.get("X-jsonblob") || (r.headers.get("Location") || "").split("/").pop();
-    if (!id) throw new Error("The service did not return a list id");
-    return id;
-  }
-  // Every change: optimistic local apply, then re-read the latest record, apply again, and write it back.
-  function op(fn) {
-    if (cache) { try { var local = clone(cache); fn(local); applyDoc(local); } catch (e) {} }
-    pending++;
-    var p = queue.then(async function () {
-      var doc = clone(await load());
-      fn(doc);
-      await save(doc);
-    });
-    queue = p.catch(function () {});
-    p.finally(function () { pending--; });
-    p.catch(function (e) { if (e && e.code !== "gone") $("ro-notice").hidden = false; });
-    return p;
-  }
-  function at(doc, path, create) {
-    var segs = path.split("/"), o = doc;
-    for (var i = 0; i < segs.length - 1; i++) { if (!o[segs[i]]) { if (!create) return null; o[segs[i]] = {}; } o = o[segs[i]]; }
-    return { parent: o, key: segs[segs.length - 1] };
-  }
+  function onErr(e) { $("ro-notice").hidden = false; toast("Live updates stopped" + (e && e.message ? ": " + e.message : ".")); }
   function makeDb() {
-    return { doc: function (path) { return {
-      set: function (d) { return op(function (doc) { var p = at(doc, path, true); p.parent[p.key] = d; }); },
-      update: function (d) { return op(function (doc) {
-        var p = at(doc, path, true), cur = p.parent[p.key];
-        if (!cur) throw new Error("This item was deleted by someone else");
-        Object.keys(d).forEach(function (k) { if (d[k] === null || d[k] === undefined) delete cur[k]; else cur[k] = d[k]; });
-      }); },
-      delete: function () { return op(function (doc) { var p = at(doc, path, false); if (p && p.parent) delete p.parent[p.key]; }); }
+    // Small adapter so the rest of the page keeps the same doc() calls.
+    return { doc: function (path) { var r = root.child(path); return {
+      set: function (d) { return r.set(d); },
+      update: function (d) { return r.update(d); },
+      delete: function () { return r.remove(); }
     }; } };
   }
-  function poll() {
-    clearTimeout(pollTimer);
-    if (document.visibilityState !== "visible" || !storeId) { pollTimer = setTimeout(poll, 5000); return; }
-    var run = pending ? Promise.resolve() : load().catch(function (e) {
-      if (e && e.code === "gone") showGone(); else $("ro-notice").hidden = false;
+  function seedMerge() {
+    return root.once("value").then(function (snap) {
+      var doc = snap.val() || {};
+      doc.meta = doc.meta && doc.meta.people ? doc.meta : clone(SEED.meta);
+      doc.sections = Object.assign({}, clone(SEED.sections), doc.sections || {});
+      doc.tasks = Object.assign({}, clone(SEED.tasks), doc.tasks || {});
+      return root.set(doc);
     });
-    run.finally(function () { pollTimer = setTimeout(poll, 5000); });
   }
-  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && storeId) poll(); });
+  function loadSeed() {
+    if (!root) { toast("Not connected to the shared list."); return; }
+    toast("Adding the spreadsheet tasks…");
+    seedMerge().then(function () { toast("Tasks added"); }, function (e) { toast("Could not add them: " + (e && e.message || e)); });
+  }
+  app.addEventListener("click", function (e) { if (e.target.closest("#btn-seed")) loadSeed(); });
 
-  function showStart(msg, backup) {
+  function showSetup(msg) {
     $("footer").hidden = true;
-    app.innerHTML = '<div class="panel"><h3>' + esc(msg) + '</h3>' +
-      '<p style="margin:0;color:var(--muted)">This makes the shared list and gives you a link. Everyone who opens that link sees and edits the same list.</p>' +
-      '<div class="actions">' + (backup ? '<button class="btn primary" id="btn-restore">Restore from this phone’s copy</button>' : '') +
-      '<button class="btn' + (backup ? '' : ' primary') + '" id="btn-create">Start with the spreadsheet tasks</button></div></div>';
-    var go = function (doc) {
-      app.innerHTML = '<div class="state">Creating the list…</div>';
-      create(doc).then(function (id) {
-        storeId = id; history.replaceState(null, "", "#" + id);
-        state.db = makeDb(); state.canWrite = true;
-        return load();
-      }).then(function () { $("footer").hidden = false; openShare(); poll(); })
-        .catch(function (e) { showStart("Could not create the list: " + (e.message || e), backup); });
-    };
-    $("btn-create").addEventListener("click", function () { go(clone(SEED)); });
-    if (backup) $("btn-restore").addEventListener("click", function () { go(backup); });
-  }
-  function showGone() {
-    clearTimeout(pollTimer); storeId = ""; state.db = null;
-    var backup = null; try { backup = JSON.parse(localStorage.getItem("uc39.backup") || "null"); } catch (e) {}
-    showStart("This list no longer exists on the server.", backup && backup.tasks ? backup : null);
+    app.innerHTML = '<div class="panel"><h3>' + esc(msg || "Connect the family list") + '</h3>' +
+      '<p style="margin:0;color:var(--muted)">Paste the Realtime Database address from Firebase. It looks like <code>https://something-default-rtdb.europe-west1.firebasedatabase.app</code>. After this, the link you share carries it, so nobody else has to do this.</p>' +
+      '<div class="inline-form"><input id="setup-url" placeholder="https://…firebasedatabase.app" aria-label="Database address" inputmode="url" autocapitalize="off" autocorrect="off"></div>' +
+      '<div class="actions"><span></span><button class="btn primary" id="setup-go">Connect</button></div></div>';
+    $("setup-go").addEventListener("click", function () {
+      var u = $("setup-url").value.trim().replace(/\/+$/, "");
+      if (!/^https:\/\/[\w.-]+\.(firebasedatabase\.app|firebaseio\.com)$/.test(u)) { toast("That does not look like a Firebase database address."); return; }
+      dbUrl = u; history.replaceState(null, "", "#db=" + encodeURIComponent(u)); connect(true);
+    });
+    $("setup-url").addEventListener("keydown", function (e) { if (e.key === "Enter") $("setup-go").click(); });
   }
   function openShare() { $("share-url").value = location.href; $("share-panel").hidden = false; $("people-panel").hidden = true; $("section-panel").hidden = true; }
   $("btn-share").addEventListener("click", openShare);
@@ -655,14 +599,33 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inp.value).then(done, fallback); else fallback();
   });
 
-  function start() {
-    if (!storeId) { showStart("Set up the family list", null); return; }
+  function connect(firstTime) {
+    if (!window.firebase) { app.innerHTML = '<div class="state">The database library did not load. Check your internet connection and reload.</div>'; return; }
+    app.innerHTML = '<div class="state">Connecting…</div>';
+    try {
+      if (!firebase.apps.length) firebase.initializeApp({ databaseURL: dbUrl });
+      root = firebase.database().ref("uc39");
+    } catch (e) { showSetup("Could not connect: " + (e.message || e)); return; }
     state.db = makeDb(); state.canWrite = true;
-    load().then(function () { $("footer").hidden = false; poll(); })
-      .catch(function (e) {
-        if (e && e.code === "gone") showGone();
-        else app.innerHTML = '<div class="state">Could not load the list: ' + esc(e.message || e) + '. Pull to refresh to try again.</div>';
-      });
+    var ready = false;
+    root.once("value").then(function (snap) {
+      if (!snap.exists()) return root.set(clone(SEED));
+    }).then(function () {
+      ready = true; $("footer").hidden = false;
+      root.child("sections").on("value", function (x) { state.sections = objToList(x.val()); state.loaded.sections = true; render(); }, onErr);
+      root.child("tasks").on("value", function (x) { state.tasks = objToList(x.val()); state.loaded.tasks = true; render(); }, onErr);
+      root.child("meta/people").on("value", function (x) { var b = x.val(); state.people = (b && Array.isArray(b.names)) ? b.names.slice() : []; state.loaded.people = true; render(); }, onErr);
+      firebase.database().ref(".info/connected").on("value", function (x) { if (state.loaded.tasks) $("ro-notice").hidden = !!x.val(); });
+      if (firstTime) openShare();
+    }).catch(function (e) {
+      var msg = (e && e.code === "PERMISSION_DENIED") ? "The database refused access. Check the Rules tab in Firebase." : (e && e.message || String(e));
+      showSetup("Could not read the list: " + msg);
+    });
+    setTimeout(function () { if (!ready && app.textContent.indexOf("Connecting") >= 0) showSetup("The database did not answer. Check the address and your connection."); }, 15000);
+  }
+  function start() {
+    if (!dbUrl) { showSetup(); return; }
+    connect(false);
   }
   start();
 })();
