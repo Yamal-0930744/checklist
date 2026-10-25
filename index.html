@@ -130,6 +130,42 @@
   .state { margin-top: 24px; text-align: center; color: var(--muted); padding: 24px; }
   .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 9px 14px; border-radius: 8px; font-size: 0.9rem; max-width: calc(100% - 32px); z-index: 20; }
   .toast[hidden] { display: none; }
+
+  /* view switch */
+  .toprow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .views { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: max-content; }
+  .views button { border: 0; background: var(--surface); padding: 6px 14px; font-size: 0.9rem; min-height: 34px; }
+  .views button.on { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+
+  /* timeline */
+  .tl { margin-top: 18px; }
+  .tl-day { position: relative; display: grid; grid-template-columns: 56px 1fr; gap: 14px; padding-bottom: 22px; }
+  .tl-day::before { content: ""; position: absolute; left: 63px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+  .tl-day:last-child::before { bottom: auto; height: 100%; }
+  .tl-dot { position: absolute; left: 58px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--muted); z-index: 1; }
+  .tl-day.past .tl-dot { border-color: var(--line); background: var(--surface-2); }
+  .tl-day.past.overdue .tl-dot { border-color: var(--danger); }
+  .tl-day.today .tl-dot { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .tl-day.milestone .tl-dot { left: 56px; top: 3px; width: 16px; height: 16px; background: var(--accent); border-color: var(--accent); }
+  .tl-day.nodate .tl-dot { border-style: dashed; }
+  .tl-date { text-align: right; display: grid; gap: 1px; padding-top: 1px; font-variant-numeric: tabular-nums; }
+  .tl-date b { font-family: var(--font-display); font-size: 0.9rem; font-weight: 700; color: var(--fg); white-space: nowrap; }
+  .tl-date span { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .tl-day.past .tl-date b { color: var(--muted); }
+  .tl-day.past.overdue .tl-date b { color: var(--danger); }
+  .tl-day.today .tl-date b { color: var(--accent); }
+  .tl-body { min-width: 0; display: grid; gap: 8px; }
+  .tl-flag { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 2px 0 4px; }
+  .tl-flag h2 { font-size: 1.05rem; color: var(--accent); }
+  .tl-flag h2 button { all: unset; cursor: pointer; font: inherit; }
+  .tl-flag h2 button:hover { text-decoration: underline; }
+  .tl-flag .count { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .tl-flag .count.all { color: var(--done); font-weight: 700; }
+  .tl-flag .sec-edit { width: 100%; display: grid; gap: 8px; background: var(--surface-2); border-radius: var(--radius); padding: 10px; }
+  .tl-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .tl-empty { color: var(--muted); font-size: 0.9rem; font-style: italic; padding-top: 2px; }
+  .chip.small.sec { background: var(--surface-2); border-color: transparent; color: var(--muted); }
+  .today-line { color: var(--accent); font-weight: 700; font-size: 0.85rem; padding-top: 2px; }
 </style>
 
 </head>
@@ -141,6 +177,13 @@
       <span class="overall" id="overall">Loading…</span>
     </div>
     <div class="bar" aria-hidden="true"><i id="overallbar"></i></div>
+    <div class="toprow">
+      <div class="views" role="tablist" id="views">
+        <button data-view="timeline" role="tab">Timeline</button>
+        <button data-view="milestones" role="tab">Milestones</button>
+      </div>
+      <button class="chip" id="hidedone" data-act="hidedone">Hide done</button>
+    </div>
     <div class="filters" id="filters"></div>
   </div>
 </header>
@@ -149,7 +192,8 @@
   <div class="notice warn" id="ro-notice" hidden>Could not reach the shared list. Check your internet connection; your changes will not be saved until it is back.</div>
   <div id="app"><div class="state">Loading the family checklist…</div></div>
   <div class="footer-actions" id="footer" hidden>
-    <button class="btn primary" id="btn-add-section">+ Add milestone</button>
+    <button class="btn primary" id="btn-add-task">+ Add task</button>
+    <button class="btn" id="btn-add-section">+ Add milestone</button>
     <button class="btn" id="btn-people">People</button>
     <button class="btn" id="btn-share">Share link</button>
   </div>
@@ -161,6 +205,17 @@
       <button class="btn" id="share-close">Close</button>
     </div>
     <p style="margin:0;color:var(--muted);font-size:.9rem">Anyone who opens this link can tick and edit. No account needed. Keep it within the family.</p>
+  </div>
+  <div class="panel" id="task-panel" hidden>
+    <h3>New task</h3>
+    <div class="inline-form">
+      <input id="nt-title" placeholder="What needs to happen?" aria-label="Task" maxlength="200">
+    </div>
+    <div class="two">
+      <label class="field"><span>Milestone</span><select id="nt-sec"></select></label>
+      <label class="field"><span>Date (optional)</span><input id="nt-date" type="date"></label>
+    </div>
+    <div class="actions"><button class="btn" id="nt-cancel">Cancel</button><button class="btn primary" id="nt-save">Add task</button></div>
   </div>
   <div class="panel" id="section-panel" hidden>
     <h3>New milestone</h3>
@@ -190,11 +245,12 @@
   var app = $("app");
   var state = {
     db: null, readOnly: false, loaded: { tasks: false, sections: false, people: false },
-    people: [], sections: [], tasks: [], filter: "", hideDone: false, expanded: null, editingSection: null,
+    people: [], sections: [], tasks: [], filter: "", hideDone: false, expanded: null, editingSection: null, view: "timeline",
     pendingRender: false
   };
   var timers = {};
   var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function today() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
@@ -202,11 +258,14 @@
     if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
     var p = iso.split("-"); return parseInt(p[2], 10) + " " + MONTHS[parseInt(p[1], 10) - 1] + " " + p[0];
   }
+  function fmtDay(iso) { var p = iso.split("-"); return parseInt(p[2], 10) + " " + MONTHS[parseInt(p[1], 10) - 1]; }
+  function weekday(iso) { var d = new Date(iso + "T12:00:00"); return isNaN(d) ? "" : DAYS[d.getDay()]; }
+  function secById(id) { for (var i = 0; i < state.sections.length; i++) if (state.sections[i].id === id) return state.sections[i]; return null; }
   function newId(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function toast(msg) { var t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(timers.toast); timers.toast = setTimeout(function () { t.hidden = true; }, 3500); }
 
-  try { state.hideDone = localStorage.getItem("uc39.hideDone") === "1"; state.filter = localStorage.getItem("uc39.filter") || ""; } catch (e) {}
-  function remember() { try { localStorage.setItem("uc39.hideDone", state.hideDone ? "1" : "0"); localStorage.setItem("uc39.filter", state.filter); } catch (e) {} }
+  try { state.hideDone = localStorage.getItem("uc39.hideDone") === "1"; state.filter = localStorage.getItem("uc39.filter") || ""; if (localStorage.getItem("uc39.view") === "milestones") state.view = "milestones"; } catch (e) {}
+  function remember() { try { localStorage.setItem("uc39.hideDone", state.hideDone ? "1" : "0"); localStorage.setItem("uc39.filter", state.filter); localStorage.setItem("uc39.view", state.view); } catch (e) {} }
 
   /* ---------- writes ---------- */
   function guard(fn) {
@@ -232,11 +291,12 @@
     var run = function () { guard(function () { return taskRef(id).update(patch); }); };
     if (delay) timers[key] = setTimeout(run, delay); else run();
   }
-  function addTask(sectionId, title) {
+  function addTask(sectionId, title, due) {
     title = title.trim(); if (!title) return;
+    if (!secById(sectionId)) { toast("Pick a milestone first."); return; }
     var max = 0; state.tasks.forEach(function (t) { if (t.section === sectionId && t.order > max) max = t.order; });
     var id = newId("t");
-    guard(function () { return taskRef(id).set({ title: title, section: sectionId, assignees: [], done: false, doneAt: null, due: null, note: "", order: max + 1, createdAt: new Date().toISOString() }); });
+    guard(function () { return taskRef(id).set({ title: title, section: sectionId, assignees: [], done: false, doneAt: null, due: due || null, note: "", order: max + 1, createdAt: new Date().toISOString() }); });
   }
   function deleteTask(id) { state.expanded = null; guard(function () { return taskRef(id).delete(); }); }
   function addSection(title, date) {
@@ -274,8 +334,8 @@
     var html = '<span class="lbl">Show</span>';
     html += '<button class="chip' + (state.filter ? "" : " on") + '" data-filter="">Everyone</button>';
     state.people.forEach(function (p) { html += '<button class="chip' + (state.filter === p ? " on" : "") + '" data-filter="' + esc(p) + '">' + esc(p) + '</button>'; });
-    html += '<button class="chip' + (state.hideDone ? " on" : "") + '" data-act="hidedone" style="margin-left:auto">' + (state.hideDone ? "Showing open only" : "Hide done") + '</button>';
     $("filters").innerHTML = html;
+    var hd = $("hidedone"); hd.classList.toggle("on", state.hideDone); hd.textContent = state.hideDone ? "Showing open only" : "Hide done";
   }
   function renderOverall() {
     var total = state.tasks.length, done = state.tasks.filter(function (t) { return t.done; }).length;
@@ -290,6 +350,7 @@
   function renderTask(t) {
     var cls = "task" + (t.done ? " done" : "") + (state.expanded === t.id ? " editing" : "");
     var meta = chipsFor(t);
+    if (state.view === "timeline") { var sec = secById(t.section); if (sec) meta += '<span class="chip small sec">' + esc(sec.title) + '</span>'; }
     if (t.due) meta += '<span class="due' + (!t.done && t.due < today() ? " overdue" : "") + '">📅 ' + esc(fmtDate(t.due)) + '</span>';
     if (t.done && t.doneAt) meta += '<span class="doneat">✓ done ' + esc(fmtDate(t.doneAt)) + '</span>';
     var html = '<li class="' + cls + '" data-id="' + esc(t.id) + '">' +
@@ -321,6 +382,53 @@
       '<div class="actions"><button class="btn danger" data-act="delete">Delete task</button><button class="btn primary" data-act="close">Done editing</button></div>' +
       '</div>';
   }
+  function sectionForm(s) {
+    return '<div class="inline-form">' +
+      '<input id="es-title-' + esc(s.id) + '" data-sf="title" value="' + esc(s.title) + '" aria-label="Milestone name">' +
+      '<input id="es-date-' + esc(s.id) + '" data-sf="date" type="date" value="' + esc(s.date || "") + '" aria-label="Milestone date">' +
+      '</div><div class="actions">' +
+      '<button class="btn danger" data-act="delsec">Delete milestone</button>' +
+      '<button class="btn primary" data-act="closesec">Done</button></div>';
+  }
+  function renderTimeline() {
+    if (!state.tasks.length && !state.sections.length) return '<div class="state">No tasks yet. Add a milestone or a task below.</div>';
+    var secOrder = {}; state.sections.forEach(function (x) { secOrder[x.id] = x.order || 0; });
+    var groups = {}, undated = [], td = today();
+    function grp(d) { return groups[d] || (groups[d] = { ms: [], tasks: [] }); }
+    state.sections.forEach(function (x) { if (x.date) grp(x.date).ms.push(x); });
+    state.tasks.forEach(function (t) {
+      if (state.hideDone && t.done && state.expanded !== t.id) return;
+      if (state.filter && (t.assignees || []).indexOf(state.filter) < 0) return;
+      var sec = secById(t.section), d = t.due || (sec && sec.date) || null;
+      if (d) grp(d).tasks.push(t); else undated.push(t);
+    });
+    var dates = Object.keys(groups);
+    if (dates.indexOf(td) < 0) { groups[td] = { ms: [], tasks: [], marker: true }; dates.push(td); }
+    dates.sort();
+    var byOrder = function (a, b) { return (secOrder[a.section] || 0) - (secOrder[b.section] || 0) || (a.order || 0) - (b.order || 0); };
+    var html = '<div class="tl">';
+    dates.forEach(function (d) {
+      var g = groups[d]; g.tasks.sort(byOrder); g.ms.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+      var open = g.tasks.filter(function (t) { return !t.done; }).length;
+      var cls = "tl-day" + (d < td ? " past" : "") + (d === td ? " today" : "") + (g.ms.length ? " milestone" : "") + (d < td && open ? " overdue" : "");
+      html += '<div class="' + cls + '"><div class="tl-date"><b>' + esc(fmtDay(d)) + '</b><span>' + (d === td ? "today" : esc(weekday(d))) + '</span></div><span class="tl-dot"></span><div class="tl-body">';
+      g.ms.forEach(function (x) {
+        var all = state.tasks.filter(function (t) { return t.section === x.id; }), done = all.filter(function (t) { return t.done; }).length;
+        html += '<section class="tl-flag" data-sec="' + esc(x.id) + '">';
+        if (state.editingSection === x.id) html += '<div class="sec-edit">' + sectionForm(x) + '</div>';
+        else html += '<h2><button data-act="editsec" title="Edit milestone">' + esc(x.title) + '</button></h2>' + (all.length ? '<span class="count' + (done === all.length ? " all" : "") + '">' + done + "/" + all.length + ' done</span>' : '');
+        html += '</section>';
+      });
+      if (g.tasks.length) html += '<div class="tl-card"><ul class="tasks">' + g.tasks.map(renderTask).join("") + '</ul></div>';
+      else if (g.marker) html += '<div class="tl-empty">Nothing planned for today</div>';
+      html += '</div></div>';
+    });
+    if (undated.length) {
+      undated.sort(byOrder);
+      html += '<div class="tl-day nodate"><div class="tl-date"><b>No date</b><span>yet</span></div><span class="tl-dot"></span><div class="tl-body"><div class="tl-card"><ul class="tasks">' + undated.map(renderTask).join("") + '</ul></div></div></div>';
+    }
+    return html + '</div>';
+  }
   function renderSection(s) {
     var all = state.tasks.filter(function (t) { return t.section === s.id; });
     var done = all.filter(function (t) { return t.done; }).length;
@@ -328,13 +436,7 @@
     var count = all.length ? done + "/" + all.length : "";
     var head;
     if (state.editingSection === s.id) {
-      head = '<div class="sec-head" style="display:grid;gap:8px">' +
-        '<div class="inline-form">' +
-        '<input id="es-title-' + esc(s.id) + '" data-sf="title" value="' + esc(s.title) + '" aria-label="Milestone name">' +
-        '<input id="es-date-' + esc(s.id) + '" data-sf="date" type="date" value="' + esc(s.date || "") + '" aria-label="Milestone date">' +
-        '</div><div class="actions">' +
-        '<button class="btn danger" data-act="delsec">Delete milestone</button>' +
-        '<button class="btn primary" data-act="closesec">Done</button></div></div>';
+      head = '<div class="sec-head" style="display:grid;gap:8px">' + sectionForm(s) + '</div>';
     } else {
       head = '<div class="sec-head">' +
         '<span class="date' + (s.date ? "" : " tbd") + '">' + (s.date ? esc(fmtDate(s.date)) : "date tbd") + '</span>' +
@@ -353,9 +455,12 @@
     if (ae && app.contains(ae) && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) { state.pendingRender = true; renderOverall(); return; }
     state.pendingRender = false;
     renderFilters(); renderOverall();
+    var vb = $("views").querySelectorAll("button"); for (var i = 0; i < vb.length; i++) { var on = vb[i].dataset.view === state.view; vb[i].classList.toggle("on", on); vb[i].setAttribute("aria-selected", on ? "true" : "false"); }
     var secs = state.sections.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
-    if (!secs.length) { app.innerHTML = '<div class="state">No milestones yet. Add the first one below.</div>'; }
+    if (state.view === "timeline") app.innerHTML = renderTimeline();
+    else if (!secs.length) { app.innerHTML = '<div class="state">No milestones yet. Add the first one below.</div>'; }
     else app.innerHTML = secs.map(renderSection).join("");
+    $("nt-sec").innerHTML = secs.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.title) + '</option>'; }).join("");
     $("footer").hidden = state.readOnly;
     renderPeople();
   }
@@ -366,15 +471,26 @@
   }
 
   /* ---------- events ---------- */
-  $("filters").addEventListener("click", function (e) {
-    var b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.act === "hidedone") state.hideDone = !state.hideDone;
-    else if (b.dataset.filter !== undefined) state.filter = b.dataset.filter;
-    remember(); render();
+  $("views").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-view]"); if (!b) return;
+    state.view = b.dataset.view; remember(); render();
   });
+  $("btn-add-task").addEventListener("click", function () { $("task-panel").hidden = false; $("section-panel").hidden = true; $("people-panel").hidden = true; $("nt-title").focus(); });
+  $("nt-cancel").addEventListener("click", function () { $("task-panel").hidden = true; });
+  $("nt-save").addEventListener("click", function () {
+    if (!$("nt-title").value.trim()) { toast("Give the task a name."); return; }
+    addTask($("nt-sec").value, $("nt-title").value, $("nt-date").value || null);
+    $("nt-title").value = ""; $("nt-date").value = ""; $("task-panel").hidden = true;
+  });
+  $("nt-title").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("nt-save").click(); } });
+  $("filters").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-filter]"); if (!b) return;
+    state.filter = b.dataset.filter; remember(); render();
+  });
+  $("hidedone").addEventListener("click", function () { state.hideDone = !state.hideDone; remember(); render(); });
   app.addEventListener("click", function (e) {
     var b = e.target.closest("button[data-act]"); if (!b) return;
-    var li = b.closest("li.task"), sec = b.closest("section.section");
+    var li = b.closest("li.task"), sec = b.closest("[data-sec]");
     var id = li && li.dataset.id, sid = sec && sec.dataset.sec, act = b.dataset.act;
     if (act === "toggle") toggleDone(id);
     else if (act === "expand") { state.expanded = state.expanded === id ? null : id; render(); if (state.expanded) { var f = $("f-title-" + id); } }
@@ -398,7 +514,7 @@
       patch[el.dataset.f] = v;
       patchTask(li.dataset.id, patch, el.tagName === "SELECT" || el.type === "date" ? 0 : 600);
     }
-    var sec = el.closest("section.section");
+    var sec = el.closest("[data-sec]");
     if (el.dataset.sf && sec) {
       var p2 = {}; p2[el.dataset.sf] = el.dataset.sf === "date" ? (el.value || null) : el.value;
       clearTimeout(timers["sec:" + sec.dataset.sec + el.dataset.sf]);
